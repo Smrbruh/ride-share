@@ -1,0 +1,166 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id               Int         @id @default(autoincrement()) @map("user_id")
+  firstName        String      @map("first_name") @db.VarChar(100)
+  lastName         String      @map("last_name") @db.VarChar(100)
+  email            String      @unique @db.VarChar(150)
+  phoneNumber      String      @unique @map("phone_number") @db.VarChar(30)
+  passwordHash     String      @map("password_hash") @db.VarChar(255)
+  registrationDate DateTime    @default(now()) @map("registration_date") @db.Date
+  status           String      @default("active") @db.VarChar(20)
+  bookings         Booking[]
+  userPromos       UserPromo[]
+
+  @@map("user")
+}
+
+model Driver {
+  id                 Int      @id @default(autoincrement()) @map("driver_id")
+  firstName          String   @map("first_name") @db.VarChar(100)
+  lastName           String   @map("last_name") @db.VarChar(100)
+  email              String   @unique @db.VarChar(150)
+  phoneNumber        String   @unique @map("phone_number") @db.VarChar(30)
+  licenseNumber      String   @unique @map("license_number") @db.VarChar(50)
+  licenseExpiryDate  DateTime @map("license_expiry_date") @db.Date
+  hireDate           DateTime @map("hire_date") @db.Date
+  status             String   @default("active") @db.VarChar(20)
+  passwordHash       String   @map("password_hash") @db.VarChar(255)
+  vehicle            Vehicle?
+  rides              Ride[]
+
+  @@map("driver")
+}
+
+model Admin {
+  id           Int    @id @default(autoincrement()) @map("admin_id")
+  firstName    String @map("first_name") @db.VarChar(100)
+  lastName     String @map("last_name") @db.VarChar(100)
+  email        String @unique @db.VarChar(150)
+  passwordHash String @map("password_hash") @db.VarChar(255)
+  role         String @default("admin") @db.VarChar(20)
+
+  @@map("admin")
+}
+
+model VehicleType {
+  id         Int      @id @default(autoincrement()) @map("vehicle_type_id")
+  typeName   String   @unique @map("type_name") @db.VarChar(50)
+  baseFare   Decimal  @map("base_fare") @db.Decimal(10, 2)
+  perKmRate  Decimal  @map("per_km_rate") @db.Decimal(10, 2)
+  vehicles   Vehicle[]
+
+  @@map("vehicle_type")
+}
+
+model Vehicle {
+  id               Int         @id @default(autoincrement()) @map("vehicle_id")
+  driverId         Int         @unique @map("driver_id")
+  vehicleTypeId    Int         @map("vehicle_type_id")
+  plateNumber      String      @unique @map("plate_number") @db.VarChar(20)
+  model            String      @db.VarChar(100)
+  color            String      @db.VarChar(30)
+  manufactureYear  Int         @map("manufacture_year")
+  driver           Driver      @relation(fields: [driverId], references: [id], onDelete: Cascade)
+  vehicleType      VehicleType @relation(fields: [vehicleTypeId], references: [id])
+
+  @@map("vehicle")
+}
+
+model Location {
+  id            Int      @id @default(autoincrement()) @map("location_id")
+  address       String   @db.VarChar(255)
+  city          String   @db.VarChar(100)
+  latitude      Decimal  @db.Decimal(9, 6)
+  longitude     Decimal  @db.Decimal(9, 6)
+  pickupRides   Ride[]   @relation("PickupLocation")
+  dropoffRides  Ride[]   @relation("DropoffLocation")
+
+  @@map("location")
+}
+
+model Ride {
+  id                 Int      @id @default(autoincrement()) @map("ride_id")
+  driverId           Int      @map("driver_id")
+  pickupLocationId   Int      @map("pickup_location_id")
+  dropoffLocationId  Int      @map("dropoff_location_id")
+  startTime          DateTime @map("start_time")
+  endTime            DateTime? @map("end_time")
+  distanceKm         Decimal  @map("distance_km") @db.Decimal(8, 2)
+  status             String   @default("scheduled") @db.VarChar(20)
+  fareAmount         Decimal  @map("fare_amount") @db.Decimal(10, 2)
+  driver             Driver   @relation(fields: [driverId], references: [id])
+  pickupLocation     Location @relation("PickupLocation", fields: [pickupLocationId], references: [id])
+  dropoffLocation    Location @relation("DropoffLocation", fields: [dropoffLocationId], references: [id])
+  bookings           Booking[]
+
+  @@map("ride")
+}
+
+model Booking {
+  id          Int       @id @default(autoincrement()) @map("booking_id")
+  rideId      Int       @map("ride_id")
+  userId      Int       @map("user_id")
+  bookingTime DateTime  @default(now()) @map("booking_time")
+  seatCount   Int       @map("seat_count")
+  status      String    @default("pending") @db.VarChar(20)
+  ride        Ride      @relation(fields: [rideId], references: [id])
+  user        User      @relation(fields: [userId], references: [id])
+  payment     Payment?
+  rating      Rating?
+
+  @@map("booking")
+}
+
+model Payment {
+  id             Int       @id @default(autoincrement()) @map("payment_id")
+  bookingId      Int       @unique @map("booking_id")
+  amount         Decimal   @db.Decimal(10, 2)
+  paymentMethod  String    @map("payment_method") @db.VarChar(30)
+  paymentStatus  String    @default("pending") @map("payment_status") @db.VarChar(20)
+  paymentDate    DateTime? @map("payment_date")
+  booking        Booking   @relation(fields: [bookingId], references: [id])
+
+  @@map("payment")
+}
+
+model Rating {
+  id           Int      @id @default(autoincrement()) @map("rating_id")
+  bookingId    Int      @unique @map("booking_id")
+  ratingValue  Int      @map("rating_value")
+  comment      String?  @db.VarChar(500)
+  ratingDate   DateTime @default(now()) @map("rating_date")
+  booking      Booking  @relation(fields: [bookingId], references: [id])
+
+  @@map("rating")
+}
+
+model PromoCode {
+  id                Int         @id @default(autoincrement()) @map("promo_id")
+  code              String      @unique @db.VarChar(30)
+  discountPercent   Decimal     @map("discount_percent") @db.Decimal(5, 2)
+  validFrom         DateTime    @map("valid_from") @db.Date
+  validTo           DateTime    @map("valid_to") @db.Date
+  maxUsage          Int         @map("max_usage")
+  userPromos        UserPromo[]
+
+  @@map("promo_code")
+}
+
+model UserPromo {
+  userId    Int       @map("user_id")
+  promoId   Int       @map("promo_id")
+  usageDate DateTime  @default(now()) @map("usage_date")
+  user      User      @relation(fields: [userId], references: [id])
+  promo     PromoCode @relation(fields: [promoId], references: [id])
+
+  @@id([userId, promoId])
+  @@map("user_promo")
+}
